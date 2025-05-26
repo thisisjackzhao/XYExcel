@@ -38,3 +38,4 @@ class ExcelProcessor:
                 data = base64.b64encode(buf.getvalue()).decode('utf-8')
                 return {"type": "image", "data": f"data:image/png;base64,{data}"}
         return {"type": "text", "data": "Unsupported command."}
+
