@@ -1,37 +1,41 @@
-import base64
-import io
-from typing import Dict, Any
-
 import pandas as pd
 import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
 
+class ExcelProcessor:
+    def __init__(self):
+        self.df = None
 
-def process_message(message: str, df: pd.DataFrame) -> Dict[str, Any]:
-    """Process a text command and return a response dict."""
-    cmd, *args = message.strip().lower().split()
-    if df is None:
-        return {"type": "text", "content": "No Excel file uploaded."}
-    if cmd == "sum" and args:
-        col = args[0]
-        if col in df.columns:
-            result = df[col].sum()
-            return {"type": "text", "content": f"Sum of {col}: {result}"}
-        return {"type": "text", "content": f"Column {col} not found"}
-    if cmd == "average" and args:
-        col = args[0]
-        if col in df.columns:
-            result = df[col].mean()
-            return {"type": "text", "content": f"Average of {col}: {result}"}
-        return {"type": "text", "content": f"Column {col} not found"}
-    if cmd == "plot" and args:
-        col = args[0]
-        if col in df.columns:
-            fig, ax = plt.subplots()
-            df[col].plot(kind="line", ax=ax, title=f"Plot of {col}")
-            buf = io.BytesIO()
-            plt.savefig(buf, format="png")
-            plt.close(fig)
-            data = base64.b64encode(buf.getvalue()).decode("utf-8")
-            return {"type": "image", "content": f"data:image/png;base64,{data}"}
-        return {"type": "text", "content": f"Column {col} not found"}
-    return {"type": "text", "content": "Unknown command"}
+    def load(self, file_bytes: bytes):
+        self.df = pd.read_excel(BytesIO(file_bytes))
+
+    def execute(self, command: str):
+        if self.df is None:
+            return {"type": "text", "data": "No file uploaded."}
+        parts = command.strip().split()
+        if not parts:
+            return {"type": "text", "data": "Empty command."}
+        action = parts[0].lower()
+        if action == 'sum' and len(parts) > 1:
+            col = parts[1]
+            if col in self.df.columns:
+                result = self.df[col].sum()
+                return {"type": "text", "data": f"Sum of {col}: {result}"}
+        if action == 'average' and len(parts) > 1:
+            col = parts[1]
+            if col in self.df.columns:
+                result = self.df[col].mean()
+                return {"type": "text", "data": f"Average of {col}: {result}"}
+        if action == 'plot' and len(parts) > 1:
+            col = parts[1]
+            if col in self.df.columns:
+                fig, ax = plt.subplots()
+                self.df[col].plot(kind='line', ax=ax)
+                buf = BytesIO()
+                plt.savefig(buf, format='png')
+                plt.close(fig)
+                data = base64.b64encode(buf.getvalue()).decode('utf-8')
+                return {"type": "image", "data": f"data:image/png;base64,{data}"}
+        return {"type": "text", "data": "Unsupported command."}
+
