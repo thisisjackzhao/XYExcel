@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XYExcel Chat</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #app { max-width: 700px; margin: auto; }
+        .messages { border: 1px solid #ccc; padding: 10px; min-height: 200px; margin-bottom: 10px; }
+        img { max-width: 100%; }
+        input[type="text"] { width: calc(100% - 100px); padding: 6px; }
+        button { padding: 6px 12px; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <h2>XYExcel Chat</h2>
+    <input type="file" @change="upload" accept=".xls,.xlsx">
+    <div class="messages">
+        <div v-for="(msg, i) in messages" :key="i">
+            <div v-if="msg.type==='text'">{{ msg.content }}</div>
+            <img v-else-if="msg.type==='image'" :src="'data:image/png;base64,'+msg.content">
+        </div>
+    </div>
+    <form @submit.prevent="send">
+        <input v-model="input" placeholder="Enter command">
+        <button type="submit">Send</button>
+    </form>
+</div>
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+        return { ws: null, input: '', messages: [] };
+    },
+    methods: {
+        async upload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const form = new FormData();
+            form.append('file', file);
+            await fetch('/upload', { method: 'POST', body: form });
+            this.messages.push({ type: 'text', content: 'File uploaded' });
+        },
+        connect() {
+            this.ws = new WebSocket(`ws://${location.host}/ws`);
+            this.ws.onmessage = ev => {
+                const msg = JSON.parse(ev.data);
+                this.messages.push(msg);
+            };
+        },
+        send() {
+            if (!this.ws) this.connect();
+            if (this.input.trim()) {
+                this.ws.send(this.input.trim());
+                this.input = '';
+            }
+        }
+    },
+    mounted() { this.connect(); }
+}).mount('#app');
+</script>
+</body>
+</html>
