@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XYExcel Chat</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #app { max-width: 700px; margin: auto; }
+        .messages { border: 1px solid #ccc; padding: 10px; min-height: 200px; margin-bottom: 10px; }
+        .message { margin-bottom: 8px; }
+        .user { font-weight: bold; }
+        .bot { color: green; }
+        img { max-width: 100%; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <h2>XYExcel Chat</h2>
+    <div>
+        <input type="file" @change="uploadFile" accept=".xlsx,.xls" />
+    </div>
+    <div class="messages">
+        <div v-for="(msg, i) in messages" :key="i" class="message">
+            <span :class="msg.role">{{ msg.role }}:</span>
+            <template v-if="msg.type === 'text'"> {{ msg.content }} </template>
+            <template v-else-if="msg.type === 'image'">
+                <img :src="msg.content" />
+            </template>
+        </div>
+    </div>
+    <form @submit.prevent="sendMessage">
+        <input type="text" v-model="input" placeholder="Enter command" />
+        <button type="submit">Send</button>
+    </form>
+</div>
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            input: '',
+            messages: [],
+            ws: null
+        };
+    },
+    mounted() {
+        this.connect();
+    },
+    methods: {
+        connect() {
+            this.ws = new WebSocket(`ws://${location.host}/ws`);
+            this.ws.onmessage = evt => {
+                const data = JSON.parse(evt.data);
+                this.messages.push({ role: 'bot', ...data });
+            };
+        },
+        async uploadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const form = new FormData();
+            form.append('file', file);
+            await fetch('/upload', { method: 'POST', body: form });
+        },
+        sendMessage() {
+            const text = this.input.trim();
+            if (!text || !this.ws) return;
+            this.messages.push({ role: 'user', type: 'text', content: text });
+            this.ws.send(text);
+            this.input = '';
+        }
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
