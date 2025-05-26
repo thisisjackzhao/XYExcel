@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel AI Chat</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #app { max-width: 700px; margin: auto; }
+        .messages { border: 1px solid #ccc; padding: 10px; min-height: 200px; margin-bottom: 10px; }
+        .message { margin-bottom: 8px; }
+        .user { font-weight: bold; }
+        .bot { color: green; }
+        input[type="text"] { width: calc(100% - 110px); padding: 8px; }
+        button { padding: 8px 15px; }
+        img { max-width: 100%; margin-top: 5px; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <h2>Excel AI Chat</h2>
+    <div>
+        <input type="file" @change="uploadExcel" accept=".xlsx,.xls">
+    </div>
+    <div class="messages">
+        <div v-for="(msg, index) in messages" :key="index" class="message">
+            <div v-if="msg.type === 'text'">
+                <span :class="msg.role">{{ msg.role }}:</span> {{ msg.content }}
+            </div>
+            <div v-else-if="msg.type === 'image'">
+                <span :class="msg.role">{{ msg.role }}:</span><br>
+                <img :src="msg.content" />
+            </div>
+        </div>
+    </div>
+    <form @submit.prevent="sendMessage">
+        <input type="text" v-model="input" placeholder="Type a command" required>
+        <button type="submit">Send</button>
+    </form>
+</div>
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            input: '',
+            messages: [],
+            ws: null
+        };
+    },
+    mounted() {
+        this.connect();
+    },
+    methods: {
+        connect() {
+            this.ws = new WebSocket('ws://localhost:8000/ws');
+            this.ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'text') {
+                    this.messages.push({ role: 'bot', content: data.data, type: 'text' });
+                } else if (data.type === 'image') {
+                    this.messages.push({ role: 'bot', content: 'data:image/png;base64,' + data.data, type: 'image' });
+                }
+            };
+        },
+        async uploadExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            await fetch('http://localhost:8000/upload', {
+                method: 'POST',
+                body: formData
+            });
+            this.messages.push({ role: 'system', content: 'Excel uploaded.', type: 'text' });
+        },
+        sendMessage() {
+            const msg = this.input.trim();
+            if (!msg || !this.ws) return;
+            this.messages.push({ role: 'user', content: msg, type: 'text' });
+            this.ws.send(msg);
+            this.input = '';
+        }
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
